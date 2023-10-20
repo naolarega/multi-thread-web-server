@@ -1,13 +1,13 @@
 mod core;
 
-use core::server::Server;
+use self::core::server::Server;
 
 fn main() {
     let mut server = Server::new();
 
     server.add_router(
         "/hello",
-        Box::new(|data| data)
+        |req, res| res.respond(Some("Hello World"))
     );
 
     server.serve("0.0.0.0:8080");
