@@ -1,12 +1,16 @@
-use multi_thread_web_server::Server;
+use multi_thread_web_server::{
+    HttpMethod,
+    Server
+};
 
 fn main() {
     let mut server = Server::new();
 
     server.add_router(
+        HttpMethod::GET,
         "/hello",
-        |req, res| res.respond(Some("Hello World"))
+        |_, res| res.respond(Some("Hello World"))
     );
 
-    server.serve("0.0.0.0:8080");
+    server.serve("0.0.0.0:8080").unwrap();
 }

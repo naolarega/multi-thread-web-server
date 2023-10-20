@@ -4,7 +4,7 @@ use std::{
 };
 
 pub struct Server {
-    path_handlers: HashMap<&'static str, fn(Request, Response)>,
+    path_handlers: HashMap<&'static str, (HttpMethod, fn(Request, Response))>,
 }
 
 impl Server {
@@ -16,10 +16,11 @@ impl Server {
 
     pub fn add_router(
         &mut self,
+        method: HttpMethod,
         path: &'static str,
         handler: fn(Request, Response)
     ) {
-        self.path_handlers.insert(path, handler);
+        self.path_handlers.insert(path, (method, handler));
     }
 
     pub fn serve(&mut self, host: &str) -> Result<(), String> {
