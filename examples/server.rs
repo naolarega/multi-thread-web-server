@@ -1,6 +1,4 @@
-mod core;
-
-use self::core::server::Server;
+use multi_thread_web_server::Server;
 
 fn main() {
     let mut server = Server::new();

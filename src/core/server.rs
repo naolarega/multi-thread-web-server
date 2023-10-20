@@ -53,7 +53,6 @@ pub enum HttpStatus {
     UnAuthorised = 401,
     NotFound = 404,
     InternalServerError = 500
-
 }
 
 pub struct Response {
