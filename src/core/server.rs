@@ -1,14 +1,14 @@
 use std::{
     collections::HashMap,
     fmt::Display,
-    io::{Read, Write},
+    io::Write,
     net::{TcpListener, TcpStream}
 };
 
 use super::parser;
 
 pub struct Server {
-    path_handlers: HashMap<&'static str, (HttpMethod, fn(Request, Response))>,
+    path_handlers: HashMap<&'static str, HashMap<HttpMethod, fn(Request, Response)>>,
 }
 
 impl Server {
@@ -18,35 +18,124 @@ impl Server {
         }
     }
 
-    pub fn add_router(
+    pub fn get(
+        &mut self,
+        path: &'static str,
+        handler: fn(Request, Response)
+    ) {
+        self.add_router(
+            HttpMethod::GET,
+            path,
+            handler
+        );
+    }
+
+    pub fn post(
+        &mut self,
+        path: &'static str,
+        handler: fn(Request, Response)
+    ) {
+        self.add_router(
+            HttpMethod::POST,
+            path,
+            handler
+        );
+    }
+
+    pub fn put(
+        &mut self,
+        path: &'static str,
+        handler: fn(Request, Response)
+    ) {
+        self.add_router(
+            HttpMethod::PUT,
+            path,
+            handler
+        );
+    }
+
+    pub fn patch(
+        &mut self,
+        path: &'static str,
+        handler: fn(Request, Response)
+    ) {
+        self.add_router(
+            HttpMethod::PATCH,
+            path,
+            handler
+        );
+    }
+
+    pub fn delete(
+        &mut self,
+        path: &'static str,
+        handler: fn(Request, Response)
+    ) {
+        self.add_router(
+            HttpMethod::POST,
+            path,
+            handler
+        );
+    }
+
+    pub fn option(
+        &mut self,
+        path: &'static str,
+        handler: fn(Request, Response)
+    ) {
+        self.add_router(
+            HttpMethod::OPTION,
+            path,
+            handler
+        );
+    }
+
+    fn add_router(
         &mut self,
         method: HttpMethod,
         path: &'static str,
         handler: fn(Request, Response)
     ) {
-        self.path_handlers.insert(path, (method, handler));
+        if !self.path_handlers.contains_key(path) {
+            self.path_handlers.insert(
+                path,
+                HashMap::from([
+                    (method, handler)
+                ])
+            );
+        } else {
+            let methods_handler = self.path_handlers.get_mut(path).unwrap();
+
+            if methods_handler.get(&method).is_some() {
+                panic!("handler for method [{:?}] : {path} already defined", method);
+            }
+
+            methods_handler.insert(method, handler);
+        }
     }
 
     pub fn serve(&mut self, host: &str) -> Result<(), String> {
         if let Ok(tcp_listener) = TcpListener::bind(host) {
             for tcp_stream in tcp_listener.incoming() {
                 if let Ok(mut tcp_stream) = tcp_stream {
-                    let mut buffer = String::new();
-
-                    tcp_stream.read_to_string(&mut buffer);
-
-                    let request = parser::parse_http_request(buffer);
-                    let mut response = Response::new(&mut tcp_stream);
-
-                    if let Some((method, handler)) = self.path_handlers.get(request.path.as_str()) {
-                        if request.method != *method {
-                            response.send::<String>(
-                                HttpStatus::MethodNotAllowed,
-                                None
-                            )
+                    if let Some(request) = parser::parse_http_request(&tcp_stream) {
+                        let mut response = Response::new(&mut tcp_stream);
+    
+                        if let Some(method_handler) = self.path_handlers.get(request.path.as_str()) {
+                            if let Some(handler) = method_handler.get(&request.method) {
+                                handler(request, response);
+                            } else {
+                                response.send(
+                                    HttpStatus::MethodNotAllowed,
+                                    Some("Method not allowed".to_string())
+                                );
+                            }
+                        } else {
+                            response.send(
+                                HttpStatus::NotFound,
+                                Some("Not Found".to_string())
+                            );
                         }
-
-                        handler(request, response);
                     }
                 }
             }
@@ -58,7 +147,12 @@ impl Server {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(
+    Eq,
+    PartialEq,
+    Hash,
+    Debug
+)]
 pub enum HttpMethod {
     GET,
     POST,
@@ -82,6 +176,21 @@ pub enum HttpStatus {
     NotFound = 404,
     MethodNotAllowed = 405,
     InternalServerError = 500
+}
+
+impl ToString for HttpStatus {
+    fn to_string(&self) -> String {
+        use HttpStatus::*;
+        
+        match self {
+            Ok => String::from("200 OK"),
+            BadRequest => String::from("400 Bad Request"),
+            UnAuthorised => String::from("401 Unauthorized"),
+            NotFound => String::from("404 Not Found"),
+            MethodNotAllowed => String::from("405 Method Not Allowed"),
+            InternalServerError => String::from("500 Internal Server Error")
+        }
+    }
 }
 
 pub struct Response<'a> {
